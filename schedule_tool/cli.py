@@ -1,4 +1,4 @@
-# 命令行入口 (PR2 版本: show + free)。
+# 命令行入口 (PR3 版本: show + free + common)。
 from __future__ import annotations
 import argparse
 import sys
@@ -84,6 +84,33 @@ def cmd_free(args):
                     format_time(st), format_time(en), format_duration(en - st)))
 
 
+def cmd_common(args):
+    from .common import common_free, flatten_sorted
+    schedules = _collect_inputs(args)
+    day_range = args.day_range
+    common = common_free(schedules, day_range, gap=args.gap)
+    items = flatten_sorted(common)
+
+    owners = "、".join(s.owner for s in schedules)
+    print("=" * 46)
+    print("共同空闲时段")
+    print("=" * 46)
+    print()
+    print("参与人: %s（共 %d 人）" % (owners, len(schedules)))
+    print("可用时间范围: %s-%s" % (format_time(day_range[0]), format_time(day_range[1])))
+    print("合并间隔: %d 分钟" % args.gap)
+    print()
+    print("按空闲时长从长到短排序:")
+    print()
+    if not items:
+        print("  （没有共同空闲时段）")
+        return
+    limit = args.top if args.top else len(items)
+    for idx, (d, s, e, length) in enumerate(items[:limit], start=1):
+        print("  #%d  %s  %s-%s  （%s）" % (
+            idx, weekday_name(d), format_time(s), format_time(e), format_duration(length)))
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="schedule_tool",
                                 description="课表解析与空闲时段计算工具")
@@ -104,6 +131,13 @@ def build_parser():
     sp_free.add_argument("--day-range", type=_parse_day_range,
                          default=(8 * 60, 22 * 60), metavar="HH:MM-HH:MM")
     sp_free.set_defaults(func=cmd_free)
+
+    sp_common = sub.add_parser("common", help="计算多人共同空闲（需求 3）")
+    add_common(sp_common)
+    sp_common.add_argument("--day-range", type=_parse_day_range,
+                           default=(8 * 60, 22 * 60), metavar="HH:MM-HH:MM")
+    sp_common.add_argument("--top", type=int, default=0, metavar="N")
+    sp_common.set_defaults(func=cmd_common)
 
     return p
 
